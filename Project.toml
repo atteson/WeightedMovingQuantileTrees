@@ -1,0 +1,4 @@
+name = "WeightedMovingQuantileTrees"
+uuid = "6ffb4879-b1bd-4751-a0be-d9af1615a109"
+authors = ["Kevin Atteson <kevin@atteson.com>"]
+version = "0.1.0"
