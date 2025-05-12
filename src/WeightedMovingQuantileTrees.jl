@@ -2,7 +2,7 @@ module WeightedMovingQuantileTrees
 
 using Statistics
 
-import Base: push!, delete!, getindex
+import Base: push!, delete!, getindex, argmax
 import Statistics: quantile
 
 export quantile
@@ -32,27 +32,33 @@ function WeightedMovingQuantileTree( n::Int, V, W = Int )
 end
 
 function getindex( tree::WeightedMovingQuantileTree{I, V, W}, v::V;
-                   f = (tree, d, i) -> nothing, # action to take at each node visited
+                   action = (tree, d, i) -> nothing, # action to take at each node visited
                    ) where {I,V,W}
     if tree.root == 0
-        return (0, I(0))
+        return (0, I(0), 0)
     else
         parent = I(0)
         child = I(1)
+        
         c = cmp( v, tree.value[child] )
-        d = div(c+3,2)
-        f( tree, d, child )
+        parentd = d = (c+3) >> 1
+        
+        action( tree, d, child )
+        
         while c != 0 && tree.children[d, child] != 0
-            child = tree.children[d, child]
             parent = child
-            f( tree, d, child )
+            parentd = d
+            child = tree.children[d, child]
+            
             c = cmp( v, tree.value[child] )
-            d = div(c+3,2)
+            d = (c+3) >> 1
+            
+            action( tree, d, child )
         end
         if c == 0
-            return (parent, c) # return parent if it's an exact match so delete can update parent's children
+            return (parentd, parent, c) # return parent if it's an exact match so delete can update parent's children
         else
-            return (child, c)
+            return (d, child, c)
         end
     end
 end
@@ -84,8 +90,7 @@ function update!( direction )
 end
 
 function push!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
-    (i,c) = getindex( tree, v, f = update!(1) )
-    d = div( c+3, 2 )
+    (d,i,c) = getindex( tree, v, action = update!(1) )
     if i == 0 || tree.children[d,i] == 0
         j = alloc!( tree )
         if i == 0
@@ -97,23 +102,55 @@ function push!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
         tree.left_weight[j] = tree.current_weight
         tree.left_count[j] = 1
     elseif c == 0
-        increment!( tree, i )
+        update!( 1 )( tree, i )
     else
         error( "Couldn't find the right spot to insert node" )
     end
     tree.current_weight += 1
 end
 
+function argmax( tree::WeightedMovingQuantileTree{I, V, W}, parent::I = tree.root;
+                 action = (d,i) -> nothing
+                 ) where {I,V,W}
+    child = parent
+    while tree.children[2,child] != 0
+        parent = child
+        child = tree.children[2,child]
+    end
+    return parent
+end
+
 function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
-    (i, c) = getindex( tree, v, f = update!(-1) )
-    d = div( c+3, 2 )
+    (d, i, c) = getindex( tree, v, action = update!(-1) )
     if c == 0
-        decrement!( tree, i )
-        if tree.weight[i] == 0
-            z = tree.children[:,i] .== 0
-            nz = sum(z)
-            if nz == 0
-            end
+        j = i == 0 ? tree.root : tree.children[d,i]
+        update!( 1 )( tree, j )
+        
+        nz = tree.children[:,j] .!= 0
+        if tree.left_weight[j] == sum(tree.left_weight[tree.children[nz[1],j]])
+            # this means there is no more weight associated with the value tree.value[j]
+            nnz = sum(nz)
+            if nnz == 0
+                tree.children[d,i] = 0
+            elseif nz == 1
+                tree.children[d,i] = tree.children[z,j]
+                free( tree, j )
+            else
+                # node has 2 children
+                # need to find the next highest value to swap
+                k = argmax( tree, tree.children[2,j] )
+
+                l = tree.children[1,k]
+                tree.children[2,k] = l
+
+                tree.value[j] = tree.value[l]
+
+                w = tree.left_weight[l]
+                if tree.children[1,l] != 0
+                    w -= tree.left_weight[tree.children[1,l]]
+                end
+                tree.left_weight[j] += w
+            end 
         elseif tree.weight[i] < 0
             error( "Negative weight on deletion" )
         end
@@ -122,7 +159,6 @@ function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W
         error( "Couldn't find node to delete" )
     end
 end
-
 
 function quantile( tree::WeightedMovingQuantileTree{I, V, W}, p ) where {I,V,W}
 end

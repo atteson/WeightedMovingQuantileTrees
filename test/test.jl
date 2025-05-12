@@ -19,5 +19,18 @@ push!( tree, 1 )
 @assert( tree.left_weight[2] == 2 )
 @assert( tree.left_count[2] == 1 )
 
-(c,i) = tree[4]
-(c,i) = tree[1]
+@assert( argmax( tree ) == 1 )
+
+push!( tree, 2 )
+
+@assert( tree.children[2,2] == 3 )
+@assert( tree.value[3] == 2 )
+@assert( tree.left_weight[3] == 3 )
+@assert( tree.left_count[3] == 1 )
+@assert( tree.left_weight[2] == 2 )
+@assert( tree.left_count[2] == 1 )
+@assert( tree.left_weight[1] == 6 )
+@assert( tree.left_count[1] == 3 )
+
+delete!( tree, 4 )
+
