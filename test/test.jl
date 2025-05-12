@@ -35,5 +35,22 @@ push!( tree, 2 )
 
 delete!( tree, 4 )
 
-import WeightedMovingQuantileTrees: update!
-v = 4
+@assert( tree.root[] == 2 )
+@assert( tree.value[2] == 2 )
+@assert( tree.children[1,2] == 0 )
+@assert( tree.children[2,2] == 3 )
+@assert( tree.left_weight[2] == 2 )
+@assert( tree.weight[2] == 2 )
+@assert( tree.free == 1 )
+@assert( unique(tree.children[:,1]) == [0] )
+
+push!( tree, 3 )
+@assert( tree.root[] == 2 )
+@assert( tree.value[2] == 1 )
+@assert( tree.children[:,2] == [0,3] )
+@assert( tree.left_weight[2] == 2 )
+@assert( tree.value[3] == 2 )
+@assert( tree.children[:,3] == [0,1] )
+@assert( tree.left_weight[3] == 3 )
+@assert( tree.value[1] == 3 )
+@assert( tree.left_weight[1] == 4 )

@@ -12,6 +12,8 @@ export WeightedMovingQuantileTree
 mutable struct WeightedMovingQuantileTree{I,V,W}
     children::Matrix{I}
     value::Vector{V}
+    
+    weight::Vector{W}
     left_weight::Vector{W}
     left_count::Vector{I}
     
@@ -25,7 +27,8 @@ index_sizes = 256 .<< sizeof.(index_types)
 
 function WeightedMovingQuantileTree( n::Int, V, W = Int )
     I = index_types[findfirst( index_sizes .> n )]
-    tree = WeightedMovingQuantileTree( zeros( I, 2, n ), zeros( V, n ), zeros( W, n ), zeros( I, n ),
+    tree = WeightedMovingQuantileTree( zeros( I, 2, n ), zeros( V, n ),
+                                       zeros( W, n ), zeros( W, n ), zeros( I, n ),
                                        Ref(zero( I )), one( I ), one( W ) )
     tree.children[1,:] = I[2:n;0]
     return tree
@@ -35,7 +38,7 @@ function getindex( tree::WeightedMovingQuantileTree{I, V, W}, v::V;
                    action = (tree, d, i) -> nothing, # action to take at each node visited
                    ) where {I,V,W}
     if tree.root[] == 0
-        return (tree.root, 0)
+        return (tree.root, 1)
     else
         i = tree.root
         
@@ -74,6 +77,7 @@ end
 function free!( tree::WeightedMovingQuantileTree{I,V,W}, i ) where {I,V,W}
     tree.children[1,i] = tree.free
     tree.children[2,i] = 0
+    tree.weight[i] = 0
     tree.free = i
 end
 
@@ -87,12 +91,16 @@ end
 
 function push!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
     (i, c) = getindex( tree, v, action = update!(1) )
-    j = alloc!( tree )
-    i[] = j
+    if c != 0
+        j = alloc!( tree )
+        i[] = j
         
-    tree.value[j] = v
-    tree.left_weight[j] = tree.current_weight
-    tree.left_count[j] = 1
+        tree.value[j] = v
+    
+        tree.left_weight[j] = tree.current_weight
+        tree.left_count[j] = 1
+    end
+    tree.weight[i[]] += tree.current_weight
     tree.current_weight += 1
 end
 
@@ -109,16 +117,15 @@ function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W
     (i, c) = getindex( tree, v, action = update!(-1) )
     if c == 0
         j = i[]
-        
-        nz = tree.children[:,j] .!= 0
-        if tree.left_weight[j] == sum(tree.left_weight[tree.children[Int(nz[1]),j]])
+
+        tree.weight[j] -= tree.current_weight - length(tree.value)
+        if tree.weight[j] == 0
             # this means there is no more weight associated with the value tree.value[j]
+            nz = tree.children[:,j] .!= 0
             nnz = sum(nz)
-            if nnz == 0
-                i[] = 0
-            elseif nz == 1
-                i[] = tree.children[z,j]
-                free( tree, j )
+            if nnz <= 1
+                i[] = nnz == 0 ? 0 : tree.children[nz,j][1]
+                free!( tree, j )
             else
                 # node has 2 children
                 # need to find the next highest value to swap
@@ -128,12 +135,15 @@ function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W
                 tree.children[2,k] = l
 
                 tree.value[j] = tree.value[l]
+                tree.weight[j] = tree.weight[l]
 
                 w = tree.left_weight[l]
                 if tree.children[1,l] != 0
                     w -= tree.left_weight[tree.children[1,l]]
                 end
                 tree.left_weight[j] += w
+                
+                free!( tree, l )
             end 
         elseif tree.weight[j] < 0
             error( "Negative weight on deletion" )
