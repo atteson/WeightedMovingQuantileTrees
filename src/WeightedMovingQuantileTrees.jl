@@ -80,23 +80,19 @@ end
 function update!( direction )
     return ( tree, d, i ) -> 
         if d == 1
-            tree.left_weight[i] += direction*(tree.current_weight + (direction < 0) * length(tree.value))
+            tree.left_weight[i] += direction*(tree.current_weight - (direction < 0) * length(tree.value))
             tree.left_count[i] += direction
         end
 end
 
 function push!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
     (i, c) = getindex( tree, v, action = update!(1) )
-    if i[] != 0 && c == 0
-        update!( 1 )( tree, i[] )
-    else
-        j = alloc!( tree )
-        i[] = j
+    j = alloc!( tree )
+    i[] = j
         
-        tree.value[j] = v
-        tree.left_weight[j] = tree.current_weight
-        tree.left_count[j] = 1
-    end
+    tree.value[j] = v
+    tree.left_weight[j] = tree.current_weight
+    tree.left_count[j] = 1
     tree.current_weight += 1
 end
 
@@ -113,10 +109,9 @@ function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W
     (i, c) = getindex( tree, v, action = update!(-1) )
     if c == 0
         j = i[]
-        update!( 1 )( tree, j )
         
         nz = tree.children[:,j] .!= 0
-        if tree.left_weight[j] == sum(tree.left_weight[tree.children[nz[1],j]])
+        if tree.left_weight[j] == sum(tree.left_weight[tree.children[Int(nz[1]),j]])
             # this means there is no more weight associated with the value tree.value[j]
             nnz = sum(nz)
             if nnz == 0

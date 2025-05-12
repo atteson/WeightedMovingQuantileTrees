@@ -11,10 +11,6 @@ push!( tree, 4 )
 @assert( tree.left_weight[1] == 1 )
 @assert( tree.left_count[1] == 1 )
 
-import WeightedMovingQuantileTrees: update!, alloc!
-v = 1
-
-
 push!( tree, 1 )
 
 @assert( tree.children[1,1] == 2 )
@@ -39,3 +35,5 @@ push!( tree, 2 )
 
 delete!( tree, 4 )
 
+import WeightedMovingQuantileTrees: update!
+v = 4
