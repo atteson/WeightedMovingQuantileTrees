@@ -104,11 +104,11 @@ function push!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
     tree.current_weight += 1
 end
 
-function argmax( tree::WeightedMovingQuantileTree{I, V, W}, parent::I = tree.root[] ) where {I,V,W}
+function argmax( tree::WeightedMovingQuantileTree{I, V, W}, parent = tree.root ) where {I,V,W}
     child = parent
-    while tree.children[2,child] != 0
+    while tree.children[2,child[]] != 0
         parent = child
-        child = tree.children[2,child]
+        child = Ref( tree.children, LinearIndices(tree.children)[2,child[]] )
     end
     return parent
 end
@@ -129,16 +129,16 @@ function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W
             else
                 # node has 2 children
                 # need to find the next highest value to swap
-                k = argmax( tree, tree.children[2,j] )
+                k = argmax( tree, Ref( tree.children, LinearIndices(tree.children)[1,j] ) )
 
-                l = tree.children[1,k]
-                tree.children[2,k] = l
+                l = k[]
 
                 tree.value[j] = tree.value[l]
                 tree.weight[j] = tree.weight[l]
 
                 w = tree.left_weight[l]
                 if tree.children[1,l] != 0
+                    k[] = tree.children[1,l]
                     w -= tree.left_weight[tree.children[1,l]]
                 end
                 tree.left_weight[j] += w
@@ -153,7 +153,44 @@ function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W
     end
 end
 
+function nearestbound( tree::WeightedMovingQuantileTree{I, V, W}, target, total, direction ) where {I,V,W}
+    z = tree.current_weight - length(tree.value) - 1
+
+    bound = W(direction > 0 ? total : 0)
+    value = direction > 0 ? typemax(V) : typemin(V)
+    term = W(0)
+    i = tree.root
+    
+    while i[] != 0
+        w = term + tree.left_weight[i[]] - tree.left_count[i[]] * z
+        c = cmp( w, target )
+        if direction*c >= 0 && direction*w <= direction*bound
+            bound = w
+            value = tree.value[i[]]
+        end
+        d = (3 - direction*c) >> 1
+        term += (d == 2)*w
+        i = Ref(tree.children, LinearIndices(tree.children)[d, i[]])
+    end
+    return (bound, value)
+end
+
 function quantile( tree::WeightedMovingQuantileTree{I, V, W}, p ) where {I,V,W}
+    total = binomial( length(tree.value)+1, 2 )
+
+    target = p * total
+
+    (lub, lubvalue) = nearestbound( tree, target, total, 1 )
+    (glb, glbvalue) = nearestbound( tree, target, total, -1 )
+
+    if lubvalue == typemax(V)
+        return glbvalue
+    elseif glbvalue == typemin(V)
+        return lubvalue
+    else
+        alpha = (target - glb)/(lub - glb)
+        return alpha * lubvalue + (1-alpha) * glbvalue
+    end
 end
 
 end # module WeightedMovingQuantilTrees
