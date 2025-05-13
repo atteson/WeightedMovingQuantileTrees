@@ -64,7 +64,8 @@ push!( tree, 2 )
 @assert( tree.children[:,3] == [0,1] )
 
 quantile( tree, 0.5 )
-@assert( quantile( tree, 0.75 ) == (0.75-2/3)/(1/3)*3 + (1-0.75)/(1/3)*2 )
+quantile( tree, 0.75 )
+@assert( abs( quantile( tree, 0.75 ) - (0.75-2/3)/(1/3)*3 - (1-0.75)/(1/3)*2 ) < 1e-8 )
 
 N = 4
 tree = WeightedMovingQuantileTree( N, Int )
@@ -78,5 +79,38 @@ for i = 1:length(a)-1
     push!(tree, a[i])
 end
 
-v = a[11-4]
-import WeightedMovingQuantileTrees: update!
+w = 1:4
+total = sum(w)
+qsm = []
+for j = 1:length(qs)
+    x = a[j:j+3]
+    p = sortperm( x )
+    cs = cumsum(w[p])
+    pt = 0.5*total
+    r = searchsorted(cs, pt)
+    (k1, k2) = (r.stop, r.start)
+    push!( qsm, ((pt - cs[k1])*x[p][k2] + (cs[k2] - pt)*x[p][k1])/(cs[k2] - cs[k1]) )
+end
+
+qs[1]
+
+tree = WeightedMovingQuantileTree( N, Int )
+a = [1, 2, 3, 4, 3, 2, 3, 4, 4, 2, 0]
+push!.( [tree], a[1:4] )
+delete!( tree, a[1] )
+push!( tree, a[5] )
+quantile( tree, 0.5 )
+
+x[k2]
+x[k1]
+cs[k1]
+cs[k2]
+pt
+pt - cs[k1]
+cs[k2] - pt
+x[k2]
+
+import WeightedMovingQuantileTrees: nearestbound
+direction = -1
+(I,V,W) = typeof(tree).parameters
+p = 0.5

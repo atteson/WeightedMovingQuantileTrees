@@ -168,8 +168,8 @@ function nearestbound( tree::WeightedMovingQuantileTree{I, V, W}, target, total,
             bound = w
             value = tree.value[i[]]
         end
-        d = (3 - direction*c) >> 1
-        term += (d == 2)*w
+        d = (3 - c) >> 1
+        term += (d == 2)*(w - term)
         i = Ref(tree.children, LinearIndices(tree.children)[d, i[]])
     end
     return (bound, value)
