@@ -1,4 +1,6 @@
 using WeightedMovingQuantileTrees
+using DataStructures
+using LinearAlgebra
 
 tree = WeightedMovingQuantileTree( 3, Int )
 
@@ -6,7 +8,7 @@ push!( tree, 4 )
 
 @assert( tree.root[] == 1 )
 @assert( tree.free == 2 )
-@assert( tree.value[1] == 4 )
+n@assert( tree.value[1] == 4 )
 @assert( tree.left_weight[1] == 1 )
 @assert( tree.left_count[1] == 1 )
 
@@ -85,32 +87,20 @@ qsm = []
 for j = 1:length(qs)
     x = a[j:j+3]
     p = sortperm( x )
-    cs = cumsum(w[p])
+    sd = (v -> SortedDict( v .=> zeros(length(v)) ))(unique(x[p]))
+    [sd[x[i]] += w[i] for i in 1:length(x)]
+
+    ks = keys(sd)
+    cs = cumsum(values(sd))
     pt = 0.5*total
     r = searchsorted(cs, pt)
     (k1, k2) = (r.stop, r.start)
-    push!( qsm, ((pt - cs[k1])*x[p][k2] + (cs[k2] - pt)*x[p][k1])/(cs[k2] - cs[k1]) )
+    if k1 == k2
+        q = x[p][k1]
+    else
+        q = ((pt - cs[k1])*x[p][k2] + (cs[k2] - pt)*x[p][k1])/(cs[k2] - cs[k1])
+    end
+    push!( qsm, q )
 end
+@assert( norm( qsm .- qs, Inf ) < 1e-8 )
 
-qs[1]
-
-tree = WeightedMovingQuantileTree( N, Int )
-a = [1, 2, 3, 4, 3, 2, 3, 4, 4, 2, 0]
-push!.( [tree], a[1:4] )
-delete!( tree, a[1] )
-push!( tree, a[5] )
-quantile( tree, 0.5 )
-
-x[k2]
-x[k1]
-cs[k1]
-cs[k2]
-pt
-pt - cs[k1]
-cs[k2] - pt
-x[k2]
-
-import WeightedMovingQuantileTrees: nearestbound
-direction = -1
-(I,V,W) = typeof(tree).parameters
-p = 0.5
