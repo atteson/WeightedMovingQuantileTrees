@@ -45,7 +45,7 @@ function getindex( tree::WeightedMovingQuantileTree{I, V, W}, v::V;
         c = cmp( v, tree.value[i[]] )
         d = (c+3) >> 1
         
-        action( tree, d, i[] )
+        action( tree, c, i[] )
         
         while c != 0 && i[] != 0
             i = Ref( tree.children, LinearIndices( tree.children )[d, i[]] )
@@ -54,7 +54,7 @@ function getindex( tree::WeightedMovingQuantileTree{I, V, W}, v::V;
                 c = cmp( v, tree.value[i[]] )
                 d = (c+3) >> 1
             
-                action( tree, d, i[] )
+                action( tree, c, i[] )
             end
         end
         return (i, c)
@@ -82,8 +82,8 @@ function free!( tree::WeightedMovingQuantileTree{I,V,W}, i ) where {I,V,W}
 end
 
 function update!( direction )
-    return ( tree, d, i ) -> 
-        if d == 1
+    return ( tree, c, i ) -> 
+        if c <= 0
             tree.left_weight[i] += direction*(tree.current_weight - (direction < 0) * length(tree.value))
             tree.left_count[i] += direction
         end
@@ -104,13 +104,11 @@ function push!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
     tree.current_weight += 1
 end
 
-function argmax( tree::WeightedMovingQuantileTree{I, V, W}, parent = tree.root ) where {I,V,W}
-    child = parent
-    while tree.children[2,child[]] != 0
-        parent = child
-        child = Ref( tree.children, LinearIndices(tree.children)[2,child[]] )
+function argmax( tree::WeightedMovingQuantileTree{I, V, W}, i = tree.root ) where {I,V,W}
+    while tree.children[2,i[]] != 0
+        i = Ref( tree.children, LinearIndices(tree.children)[2,i[]] )
     end
-    return parent
+    return i
 end
 
 function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W}
@@ -140,6 +138,8 @@ function delete!( tree::WeightedMovingQuantileTree{I, V, W}, v::V ) where {I,V,W
                 if tree.children[1,l] != 0
                     k[] = tree.children[1,l]
                     w -= tree.left_weight[tree.children[1,l]]
+                else
+                    k[] = 0
                 end
                 tree.left_weight[j] += w
                 
