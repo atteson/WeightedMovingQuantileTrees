@@ -156,3 +156,22 @@ for i = 1:length(x)
         println( "Done $i iterations at $(now())" )
     end
 end
+
+N = 20
+x = rand(1:1_000, 1_000_000 );
+tree = WeightedMovingQuantileTree( N, Int )
+qs = []
+printevery = 10_000
+println( "Starting at $(now())" )
+for i = 1:length(x)
+    if i > N
+        push!( qs, quantile( tree, 0.5 ) )
+        delete!( tree, x[i-N] )
+        check_left_count( x[i-N+1:i-1], tree )
+    end
+    push!(tree, x[i])
+    check_left_count( x[max(1,i-N+1):i], tree )
+    if i % printevery == 0
+        println( "Done $i iterations at $(now())" )
+    end
+end
